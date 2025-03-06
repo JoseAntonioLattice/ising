@@ -3,10 +3,11 @@ program main
   use iso_fortran_env, only: dp => real64
   implicit none
 
-  integer, parameter :: L = 8, Nm = 10**3, Nterm = 500, Nt = 100, Nskip = 10
+  integer, parameter :: L = 60, Nm = 10**3, Nterm = 500, Nt = 10, Nskip = 10
   real(dp) :: r
   integer :: i, isweeps,iskip, it
   integer :: spin(L,L), ip(L), im(L)
+  real(dp) :: E(Nm), M(Nm)
   real(dp) :: T(Nt), beta(Nt)
   real(dp), parameter :: Tmin = 0.1_dp, Tmax = 4.0_dp, DT = Tmax - Tmin
   
@@ -16,22 +17,33 @@ program main
   beta = 1/T
 
   spin = 1
-
+  
+  open(unit = 10, file = "datosF.dat")
   do it = 1, Nt
      do isweeps = 1, Nterm
         call sweeps(spin,beta(it))
      end do
 
-     do isweeps = 1, Nterm
+     do isweeps = 1, Nm
         do iskip = 1, Nskip
            call sweeps(spin,beta(it))
         end do
-     end do    
+        E(isweeps) = energy_density(spin)
+        M(isweeps) = 1.0_dp*abs(sum(spin))/L**2
+     end do
+     write(10,*) T(it), sum(E)/Nm, sum(M)/Nm
   end do
 contains
 
+  function avr(x)
+    real(dp), intent(in) :: x(:)
+    real(dp) :: avr
+
+    avr = sum(x)/size(x)
+  end function avr
+
   subroutine sweeps(spin,beta)
-    integer, intent(inout) :: spin(L,L)
+    integer, intent(inout) :: spin(:,:)
     real(dp), intent(in) ::  beta
     integer :: i, j
 
@@ -43,7 +55,7 @@ contains
   end subroutine sweeps
 
   subroutine metropolis(spin,x,beta)
-    integer, intent(inout) :: spin(L,L)
+    integer, intent(inout) :: spin(:,:)
     real(dp), intent(in) :: beta
     integer, intent(in) :: x(2)
     integer :: DH
@@ -71,5 +83,20 @@ contains
     DE = 2*spin(i,j)*(spin(ip(i),j) + spin(i,ip(j))+spin(im(i),j) + spin(i,im(j)))
     
   end function DE
+
+  function energy_density(spin)
+    integer, intent(in) :: spin(:,:)
+    real(dp) :: energy_density
+    integer :: E, i, j
+
+    E = 0
+    do i = 1, L
+       do j = 1, L
+          E = E + spin(i,j) * (spin(ip(i),j) + spin(i,ip(j)))
+       end do
+    end do
+    energy_density = -real(E,dp)/L**2
+        
+  end function energy_density
   
 end program main
