@@ -3,14 +3,14 @@ program main
   use iso_fortran_env, only: dp => real64
   implicit none
 
-  integer, parameter :: L = 60, Nm = 1000, Nterm = 500, Nt = 10, Nskip = 10
+  integer, parameter :: L = 20, Nm = 10000, Nterm = 500, Nt = 10, Nskip = 10
   real(dp) :: r
   integer :: i, isweeps,iskip, it
   integer :: spin(L,L), ip(L), im(L)
-  real(dp) :: E(Nm), M(Nm)
+  real(dp) :: E(Nm), M(Nm), sigma(Nm,L), Correlation(Nm,0:L-1)
   real(dp) :: T(Nt), beta(Nt)
-  real(dp), parameter :: Tmin = 0.1_dp, Tmax = 4.0_dp, DT = Tmax - Tmin
-  
+  real(dp), parameter :: Tmin = 2.5_dp, Tmax = 3.0_dp, DT = Tmax - Tmin
+ 
   ip = [(i+1, i = 1, L)] ; ip(L) = 1
   im = [(i-1, i = 1, L)] ; im(1) = L
   T = [(Tmin + DT*i/(Nt - 1), i = 0, Nt-1)]
@@ -21,6 +21,7 @@ program main
   call random_init(.true.,.false.)
   
   open(unit = 10, file = "datosF.dat")
+  open(unit = 20, file = "correlation.dat")
   do it = 1, Nt
      do isweeps = 1, Nterm
         call sweeps(spin,beta(it))
@@ -32,8 +33,22 @@ program main
         end do
         E(isweeps) = energy_density(spin)
         M(isweeps) = 1.0_dp*abs(sum(spin))/L**2
+        do i = 1, L 
+           sigma(isweeps,i) = (sum(spin(i,:)))/real(L,dp)
+        end do
+        do i = 0, L-1 
+           Correlation(isweeps,i) = sigma(isweeps,1)*sigma(isweeps,i+1)
+        end do
      end do
-     write(10,*) T(it), avr(E),stderr(E), avr(M), stderr(M)
+      do i = 0, L-1 
+         write(20,*) i, avr(Correlation(:,i)), stderr(Correlation(:,i)), jackknife(Correlation(:,i),10)
+      end do
+       write(20,*) L, avr(Correlation(:,0)), stderr(Correlation(:,0)), jackknife(Correlation(:,0),10)
+      write(20,*) ' '
+      write(20,*) ' '
+      write(20,*) ' '
+      
+     write(10,*) T(it), avr(E),stderr(E), jackknife(E,10), avr(M), stderr(M), jackknife(M,10)
   end do
 contains
 
@@ -59,6 +74,27 @@ contains
 
     stderr = sqrt(var(x)/size(x))
   end function stderr
+
+  function jackknife(x,bins)
+    real(dp) :: jackknife, x(:)
+    integer, intent(in) :: bins
+    integer :: MM, NN, i
+    real(dp) :: xbar, sum_x
+    real(dp) :: x_m(bins)
+
+
+    NN = size(x)
+    MM = NN/bins
+
+    xbar = avr(x)
+    sum_x = sum(x)
+    x_m = 1.0_dp/(NN-MM) * [(sum_x - sum(x(MM*(i-1)+1:MM*i)),i=1,bins)]
+
+    jackknife = sqrt( real(bins - 1,dp)/bins * sum( (x_m - xbar)**2) )
+  
+  end function jackknife
+
+  
   
   subroutine sweeps(spin,beta)
     integer, intent(inout) :: spin(L,L)
