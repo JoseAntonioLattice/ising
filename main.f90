@@ -72,21 +72,23 @@ contains
     end do
   end subroutine sweeps
 
-  subroutine metropolis(spin,x,beta)
+  subroutine metropolis(spin,x,beta,q)
     integer, intent(inout) :: spin(L,L)
     real(dp), intent(in) :: beta
     integer, intent(in) :: x(2)
     integer :: DH
     real(dp) :: r
 
+    !DH = DE(spin,x)
+    !if( DH <= 0 )then
+    !   spin(x(1),x(2)) = -spin(x(1),x(2))
+    !else
+    !   call random_number(r)
+    !   if( r <= exp(-DH*beta)) spin(x(1),x(2)) = -spin(x(1),x(2))
+    !end if
+    energy = energy(spin)
     DH = DE(spin,x)
-
-    if( DH <= 0 )then
-       spin(x(1),x(2)) = -spin(x(1),x(2))
-    else
-       call random_number(r)
-       if( r <= exp(-DH*beta)) spin(x(1),x(2)) = -spin(x(1),x(2))
-    end if
+    p = min(1.0_dp, ((expq(-beta*(H+DH)),q)/expq(-beta*H,q))**q)
     
   end subroutine metropolis
 
@@ -116,5 +118,34 @@ contains
     energy_density = -real(E,dp)/L**2
         
   end function energy_density
+
+    function energy(spin)
+    integer, intent(in) :: spin(L,L)
+    real(dp) :: energy_density
+    integer :: E, i, j
+
+    E = 0
+    do i = 1, L
+       do j = 1, L
+          E = E + spin(i,j) * (spin(ip(i),j) + spin(i,ip(j)))
+       end do
+    end do
+    energy_density = -real(E,dp)
+        
+  end function energy
+  
+  function expq(x,q)
+    real(dp), intent(in) :: x, q
+    real(dp) :: expq
+    arg = 1.0_dp - q
+    expq = (1.0_dp + arg*x)**(1/arg)
+    
+  end function expq
+
+  function escort_prob(x,q)
+    real(dp), intent(in) :: x, q 
+    real(dp) :: x, q
+    escort = (expq(x,q))**q
+  end function escort_prob
   
 end program main
